@@ -9,6 +9,32 @@ def _rolling_zscore(x: pd.Series, window: int) -> pd.Series:
     return z
 
 
+def _rolling_percentile_signal(x: pd.Series, window: int) -> pd.Series:
+    """
+    Compute rolling percentile of the latest value within each window, mapped to [-1, 1].
+    Uses average-rank interpolation for ties.
+    """
+    if window <= 1:
+        return pd.Series(index=x.index, dtype=float)
+
+    def last_value_avg_percentile(arr: np.ndarray) -> float:
+        if arr.size == 0:
+            return np.nan
+        last = arr[-1]
+        if np.isnan(last):
+            return np.nan
+        valid = arr[~np.isnan(arr)]
+        n = valid.size
+        if n == 0:
+            return np.nan
+        num_less = np.sum(valid < last)
+        num_equal = np.sum(valid == last)
+        percentile = (num_less + 0.5 * num_equal) / n  # in [0,1]
+        return 2.0 * percentile - 1.0  # map to [-1, 1]
+
+    return x.rolling(window=window, min_periods=window).apply(last_value_avg_percentile, raw=True)
+
+
 def map_factor_to_target_notional(
     factor: pd.Series,
     capital: float,
@@ -33,6 +59,10 @@ def map_factor_to_target_notional(
         s = s.clip(lower=-clip_abs, upper=clip_abs)
     elif mapper == "sign":
         s = np.sign(f)
+        s = s.clip(lower=-clip_abs, upper=clip_abs)
+    elif mapper == "percentile":
+        # Use zscore_window as the rolling window length for percentile as well
+        s = _rolling_percentile_signal(f, zscore_window)
         s = s.clip(lower=-clip_abs, upper=clip_abs)
     else:
         raise ValueError(f"Unknown mapper: {mapper}")

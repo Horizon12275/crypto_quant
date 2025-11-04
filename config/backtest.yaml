@@ -3,31 +3,31 @@
 data:
   source_csv: okx_BTCUSDT_1min_data.csv
   timezone: UTC
-  start: 2024-01-01 00:00:00
-  end: 2024-11-01 00:00:00
+  start: 2022-01-01 00:00:00
+  end: 2025-01-01 00:00:00
   # If true, forward-fill missing bars; filled bars will have volume=0
   forward_fill: true
 
 signals:
-  factor: example_momo
+  factors: [example_momo_percentile]
   lookback_minutes: 720
   k_minutes: 60
   evaluate_on_rebalance_only: true
   # zscore | sign
-  mapper: zscore
+  mapper: percentile
   zscore_window: 100
   clip_abs_signal: 1.0
 
 execution:
-  rebalance_minutes: 720   # default 12h
+  rebalance_minutes: 60   # default 12h
   trade_delay_minutes: 1   # trade at t+1 open
   initial_capital: 100000.0
   allow_short: true
-  long_leverage: 2.0
-  short_leverage: 1.5
-  cost_bps: 7.0
+  long_leverage: 1.0
+  short_leverage: 1.0
+  cost_bps: 0.0
 
 reporting:
   out_dir: reports
   ic_rolling_window: 50
-  plots: [rolling_ic, rolling_ic_cumsum, pnl, equity] 
+  plots: [rolling_ic, rolling_ic_cumsum, pnl, equity, turnover] 

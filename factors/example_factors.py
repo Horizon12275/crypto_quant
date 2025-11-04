@@ -11,11 +11,11 @@ def example_momo(window_ohlcv: np.ndarray) -> float:
     close = window_ohlcv[:, 3]
     if close.size == 0:
         return np.nan
-    mean_close = np.mean(close)
-    if mean_close == 0:
-        return 0.0
-    return float((close[-1] / mean_close) - 1.0)
+    # mean_close = np.mean(close)
+    # if mean_close == 0:
+    #     return 0.0
+    return -float((close[-1] / close[-180]) - 1.0)
 
 
 def register(registry) -> None:
-    registry.register("example_momo", example_momo) 
+    registry.register("example_momo_percentile", example_momo) 

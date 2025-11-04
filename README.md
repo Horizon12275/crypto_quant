@@ -43,7 +43,7 @@ crypto_quant/
   - `lookback_minutes`: rolling window size for factor inputs
   - `k_minutes`: label horizon; return from open[t+1] to open[t+1+k]
   - `evaluate_on_rebalance_only`: compute factor only on rebalance timestamps
-  - `mapper`: `zscore` or `sign`
+  - `mapper`: `zscore` or `sign` or `percentile`
   - `zscore_window`: rolling window for z-score
   - `clip_abs_signal`: clip final signal to [-clip, clip]
 - `execution`:

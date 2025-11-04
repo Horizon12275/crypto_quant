@@ -1,0 +1,33 @@
+data:
+  source_csv: okx_BTCUSDT_1min_data.csv
+  timezone: UTC
+  start: 2022-01-01 00:00:00
+  end: 2025-01-01 00:00:00
+  forward_fill: true
+signals:
+  factors:
+  - example_momo_percentile
+  lookback_minutes: 720
+  k_minutes: 60
+  evaluate_on_rebalance_only: true
+  mapper: percentile
+  zscore_window: 100
+  clip_abs_signal: 1.0
+  factor: example_momo_percentile
+execution:
+  rebalance_minutes: 60
+  trade_delay_minutes: 1
+  initial_capital: 100000.0
+  allow_short: true
+  long_leverage: 1.0
+  short_leverage: 1.0
+  cost_bps: 0.0
+reporting:
+  out_dir: reports
+  ic_rolling_window: 50
+  plots:
+  - rolling_ic
+  - rolling_ic_cumsum
+  - pnl
+  - equity
+  - turnover

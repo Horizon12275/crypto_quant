@@ -57,19 +57,14 @@ def crawl_exchanges_datas(exchange_name, symbol, start_time, end_time):
                 print("完成数据的请求.")
                 break
 
-            time.sleep(1)
+            time.sleep(0.1)
 
         except Exception as error:
             print(error)
-            time.sleep(10)
+            time.sleep(1)
 
 def sample_datas(exchange_name, symbol):
-    """
-
-    :param exchange_name:
-    :param symbol:
-    :return:
-    """
+    
     path = os.path.join(os.getcwd(), exchange_name, symbol.replace('/', ''))
     print(path)
     file_paths = []
@@ -96,12 +91,11 @@ def sample_datas(exchange_name, symbol):
 def clear_datas(exchange_name, symbol):
     df = sample_datas(exchange_name, symbol)
     df['open_time'] = df['open_time'].apply(lambda x: (x//60)*60)
-    # transform to NY time
-    df['Datetime'] = pd.to_datetime(df['open_time'], unit='ms') - pd.Timedelta(hours=5)
+    df['Datetime'] = pd.to_datetime(df['open_time'], unit='ms')
     df.drop_duplicates(subset=['open_time'], inplace=True)
     df.set_index('Datetime', inplace=True)
     symbol_path = symbol.replace('/', '')
     df.to_csv(f'{exchange_name}_{symbol_path}_1min_data.csv')
 
-# crawl_exchanges_datas('okx', 'BTC/USDT', '2024-01-01', '2024-11-05')
+crawl_exchanges_datas('okx', 'BTC/USDT', '2022-01-01', '2025-01-01')
 clear_datas('okx','BTC/USDT')
