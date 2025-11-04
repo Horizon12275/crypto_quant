@@ -18,6 +18,7 @@ def generate_reports(
     ic_metrics: Dict[str, pd.Series],
     results: Dict[str, pd.Series],
     plots: List[str],
+    write_results_core: bool = False,
 ) -> None:
     os.makedirs(out_dir, exist_ok=True)
 
@@ -25,11 +26,12 @@ def generate_reports(
     ic_df = pd.concat(ic_metrics.values(), axis=1)
     ic_df.to_csv(os.path.join(out_dir, "ic_metrics.csv"))
 
-    pd.DataFrame({
-        "equity": results["equity"],
-        "returns": results["returns"],
-        "pnl": results["pnl"],
-    }).to_csv(os.path.join(out_dir, "results_core.csv"))
+    if write_results_core:
+        pd.DataFrame({
+            "equity": results["equity"],
+            "returns": results["returns"],
+            "pnl": results["pnl"],
+        }).to_csv(os.path.join(out_dir, "results_core.csv"))
 
     # rolling_ic plot
     if "rolling_ic" in plots and "pearson_ic" in ic_metrics:

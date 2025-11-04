@@ -30,4 +30,5 @@ execution:
 reporting:
   out_dir: reports
   ic_rolling_window: 50
-  plots: [rolling_ic, rolling_ic_cumsum, pnl, equity, turnover] 
+  plots: [rolling_ic, rolling_ic_cumsum, pnl, equity, turnover]
+  write_results_core: false

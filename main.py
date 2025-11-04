@@ -121,6 +121,7 @@ if __name__ == "__main__":
             ic_metrics=ic_metrics,
             results=results,
             plots=cfg["reporting"].get("plots", []),
+            write_results_core=bool(cfg["reporting"].get("write_results_core", False)),
         )
 
         print("Backtest complete. Reports written to:", out_dir)

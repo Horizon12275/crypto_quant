@@ -31,3 +31,4 @@ reporting:
   - pnl
   - equity
   - turnover
+  write_results_core: false
