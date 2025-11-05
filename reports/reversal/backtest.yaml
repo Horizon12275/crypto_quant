@@ -6,16 +6,16 @@ data:
   forward_fill: true
 signals:
   factors:
-  - example_momo_percentile
+  - reversal
   lookback_minutes: 720
-  k_minutes: 60
+  k_minutes: 240
   evaluate_on_rebalance_only: true
   mapper: percentile
   zscore_window: 100
   clip_abs_signal: 1.0
-  factor: example_momo_percentile
+  factor: reversal
 execution:
-  rebalance_minutes: 60
+  rebalance_minutes: 120
   trade_delay_minutes: 1
   initial_capital: 100000.0
   allow_short: true
