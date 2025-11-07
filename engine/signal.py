@@ -44,12 +44,16 @@ def map_factor_to_target_notional(
     allow_short: bool = True,
     long_leverage: float = 1.0,
     short_leverage: float = 1.0,
+    trade_mode: str = "continuous",
+    entry_long_threshold: float = 0.9,
+    entry_short_threshold: float = -0.9,
 ) -> pd.Series:
     """
     Map factor values to target dollar notional exposures.
-    - mapper 'zscore': rolling z-score, clipped to [-clip_abs, clip_abs]
-    - mapper 'sign': sign(factor)
-    Apply leverage: s>=0 scaled by long_leverage, s<0 scaled by short_leverage.
+    - Step 1: Normalize factor -> signal in [-1, 1] using mapper.
+    - Step 2: Apply trade_mode
+        * continuous: leverage-scale normalized signal
+        * threshold: enter long if s >= long_thr, short if s <= short_thr, else no new target (NaN)
     If short is not allowed, negatives are set to 0.
     """
     f = factor.copy().astype(float)
@@ -70,11 +74,24 @@ def map_factor_to_target_notional(
     if not allow_short:
         s = s.clip(lower=0.0)
 
-    # Apply leverage asymmetrically (clearer formulation)
-    s_pos = s.clip(lower=0) * float(long_leverage)
-    s_neg = s.clip(upper=0) * float(short_leverage)
-    s_levered = s_pos + s_neg
+    if trade_mode == "continuous":
+        # Asymmetric leverage
+        s_pos = s.clip(lower=0) * float(long_leverage)
+        s_neg = s.clip(upper=0) * float(short_leverage)
+        s_levered = s_pos + s_neg
+        target_notional = capital * s_levered.fillna(0.0)
+    elif trade_mode == "threshold":
+        # Discrete entries: +1, -1, or no new instruction (NaN)
+        st = pd.Series(index=s.index, dtype=float)
+        st[(s >= float(entry_long_threshold))] = float(long_leverage)
+        st[(s <= float(entry_short_threshold))] = -float(short_leverage)
+        # If not allow_short, remove shorts
+        if not allow_short:
+            st[st < 0] = np.nan
+        target_notional = capital * st
+        target_notional.name = "target_notional"
+    else:
+        raise ValueError(f"Unknown trade_mode: {trade_mode}")
 
-    target_notional = capital * s_levered.fillna(0.0)
     target_notional.name = "target_notional"
     return target_notional 

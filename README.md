@@ -1,3 +1,6 @@
+## TODO
+2025/11/06: 完善回测框架，以直接支持0-1突破信号型的因子（例如双均线，唐奇安通道）；完善风险控制模块，支持灵活的止损阈值设定；（可选）设置根据近期波动率灵活调整的仓位
+
 ## Crypto Multi-Factor CTA Backtest (Single-Asset)
 
 This repository contains a modular, config-driven backtesting framework for a single-asset, single-factor CTA strategy using 1-minute OHLCV data (OKX via CCXT). It is designed so the same factor and signal interfaces can be reused in live trading later.
@@ -14,8 +17,8 @@ crypto_quant/
     data_loader.py          # CSV loader, UTC index, forward-fill minute gaps
     factor_engine.py        # Rolling factor computation (numpy window)
     labeler.py              # Open-to-open forward return labels
-    signal.py               # Factor -> target notional mapping (zscore/sign)
-    backtester.py           # Execution simulator (rebalance, costs, equity)
+    signal.py               # Factor -> target notional mapping (zscore/sign/threshold)
+    backtester.py           # Execution simulator (rebalance, costs, equity, stop-loss)
     metrics.py              # Rolling IC (Pearson/Spearman), IC cumsum
     report.py               # PNG plots + CSV exports per factor
   factors/
@@ -43,16 +46,21 @@ crypto_quant/
   - `lookback_minutes`: rolling window size for factor inputs
   - `k_minutes`: label horizon; return from open[t+1] to open[t+1+k]
   - `evaluate_on_rebalance_only`: compute factor only on rebalance timestamps
-  - `mapper`: `zscore` or `sign` or `percentile`
+  - `mapper`: `zscore` or `sign` to normalize factor to [-1, 1]
   - `zscore_window`: rolling window for z-score
-  - `clip_abs_signal`: clip final signal to [-clip, clip]
+  - `clip_abs_signal`: clip normalized signal to [-clip, clip]
+  - `trade_mode`: `continuous` or `threshold`
+    - `continuous`: position proportional to normalized signal (asymmetric leverage applied)
+    - `threshold`: discrete entries only when normalized signal crosses thresholds
+  - `entry_long_threshold`, `entry_short_threshold`: thresholds for `threshold` mode (e.g., 0.9, -0.9)
 - `execution`:
   - `rebalance_minutes`: fixed interval rebalancing (e.g., 720)
   - `trade_delay_minutes`: trade at t + delay minutes (e.g., 1 → next open)
   - `initial_capital`: starting capital in dollars
   - `allow_short`: whether short exposure is allowed
-  - `long_leverage`, `short_leverage`: leverage multipliers for signals >=0 and <0
+  - `long_leverage`, `short_leverage`: leverage multipliers
   - `cost_bps`: combined trading cost in basis points (fees + slippage)
+  - `stop_loss_pct`: per-trade stop-loss threshold; exit at next minute open when breached
 - `reporting`:
   - `out_dir`: base output directory (plots and CSVs)
   - `ic_rolling_window`: rolling window for IC
@@ -72,24 +80,19 @@ def example_momo(window_ohlcv: np.ndarray) -> float:
     return float((close[-1] / mean_close) - 1.0) if mean_close != 0 else 0.0
 ```
 
-- Register factors in `factors/registry.py` (built-ins are auto-registered via `register_builtin_factors()`).
+### Trade modes
+- `continuous` (original):
+  - Normalize factor to `s` in [-1, 1], apply asymmetric leverage, target notional = `capital * s_levered`.
+- `threshold` (CTA-style):
+  - Normalize factor to `s` in [-1, 1] via mapper.
+  - At evaluation (rebalance) times only:
+    - If `s >= entry_long_threshold`: open/hold long at `long_leverage * capital` notional.
+    - If `s <= entry_short_threshold`: open/hold short at `short_leverage * capital` notional.
+    - Otherwise: no new instruction (hold existing position).
 
-### Labeling
-- For factor value computed at time t, the label is the simple return from `open[t+1]` to `open[t+1+k]` where `k` is `k_minutes`.
-
-### Signal mapping and sizing
-- Map factor to a target dollar notional using either:
-  - `zscore`: rolling z-score of the factor (window = `zscore_window`), clipped to `[-clip_abs_signal, clip_abs_signal]`
-  - `sign`: `-1, 0, +1` clipped similarly
-- Apply asymmetric leverage:
-  - `long_leverage` scales signals >= 0; `short_leverage` scales signals < 0
-- If `allow_short=false`, negative signals are clipped to 0.
-
-### Execution model
-- Rebalance at fixed intervals (e.g., every 720 minutes).
-- Compute signals at the evaluation time t; place orders at `t + trade_delay_minutes` at the open price.
-- Apply a combined `cost_bps` on traded notional each rebalance.
-- Track `equity`, `returns`, `pnl`, `position_units`, `position_notional`, and `trades`.
+### Stop-loss
+- When a position is opened (or flips side), the entry price is recorded.
+- Each minute before applying scheduled trades, if the adverse return from entry reaches `-stop_loss_pct`, the position is closed immediately at that minute’s open (costs applied), and entry is reset.
 
 ### Metrics and reporting
 - Rolling IC (Pearson & Spearman) and cumulative IC (cumsum of Pearson IC) saved to CSV and PNG.
@@ -103,7 +106,7 @@ def example_momo(window_ohlcv: np.ndarray) -> float:
 ```bash
 pip install -r requirements.txt
 ```
-2. Adjust `config/backtest.yaml` if needed (dates, factor name, lookback, k, costs, etc.).
+2. Adjust `config/backtest.yaml` (dates, factor name, lookback, k, trade_mode, thresholds, costs, stop-loss).
 3. Run:
 ```bash
 python main.py

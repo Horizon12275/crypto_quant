@@ -5,30 +5,33 @@ data:
   end: 2025-01-01 00:00:00
   forward_fill: true
 signals:
-  factors:
-  - reversal
+  factor: reversal
   lookback_minutes: 720
-  k_minutes: 240
+  k_minutes: 720
   evaluate_on_rebalance_only: true
   mapper: percentile
   zscore_window: 100
   clip_abs_signal: 1.0
-  factor: reversal
+  trade_mode: threshold
+  entry_long_threshold: 0.95
+  entry_short_threshold: -0.9
+  factors:
+  - reversal
 execution:
-  rebalance_minutes: 120
+  rebalance_minutes: 720
   trade_delay_minutes: 1
   initial_capital: 100000.0
-  allow_short: true
+  allow_short: false
   long_leverage: 1.0
   short_leverage: 1.0
-  cost_bps: 0.0
+  cost_bps: 7.0
+  stop_loss_pct: 0.03
 reporting:
   out_dir: reports
   ic_rolling_window: 50
+  write_results_core: false
   plots:
   - rolling_ic
   - rolling_ic_cumsum
   - pnl
   - equity
-  - turnover
-  write_results_core: false
