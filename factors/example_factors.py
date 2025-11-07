@@ -14,6 +14,18 @@ def reversal(window_ohlcv: np.ndarray) -> float:
         return np.nan
     return -float((close[-1] / close[-wind]) - 1.0)
 
+def reversal_continuous(window_ohlcv: np.ndarray) -> float:
+    """
+    Simple momentum factor: ratio of last close to average close over the window minus 1.
+    Input shape: (lookback, 5 or 6) with columns [open, high, low, close, volume, ...].
+    Returns a scalar float.
+    """
+    wind = 720
+    close = window_ohlcv[:, 3]
+    if close.size == 0:
+        return np.nan
+    return -float((close[-1] / close[-wind]) - 1.0)
+
 def volatility(window_ohlcv: np.ndarray) -> float:
     wind = 720
     close = window_ohlcv[:, 3]
@@ -50,3 +62,4 @@ def register(registry) -> None:
     registry.register("illiq", illiq)
     registry.register("volatility", volatility)
     registry.register("pvcorr", pvcorr)
+    registry.register("reversal_continuous", reversal_continuous)
