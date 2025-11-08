@@ -1,4 +1,5 @@
 import os
+import json
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
@@ -19,8 +20,18 @@ def generate_reports(
     results: Dict[str, pd.Series],
     plots: List[str],
     write_results_core: bool = False,
+    summary: Optional[Dict[str, float]] = None,
 ) -> None:
     os.makedirs(out_dir, exist_ok=True)
+
+    # Save summary
+    if summary is not None:
+        with open(os.path.join(out_dir, "summary.json"), "w") as f:
+            json.dump(summary, f, indent=2)
+        # Print brief summary
+        print("Performance summary:")
+        for k, v in summary.items():
+            print(f"  {k}: {v}")
 
     # Save core series as CSV for convenience
     if ic_metrics:

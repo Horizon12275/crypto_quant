@@ -9,30 +9,17 @@ def _rolling_zscore(x: pd.Series, window: int) -> pd.Series:
     return z
 
 
-def _rolling_percentile_signal(x: pd.Series, window: int) -> pd.Series:
-    """
-    Compute rolling percentile of the latest value within each window, mapped to [-1, 1].
-    Uses average-rank interpolation for ties.
-    """
-    if window <= 1:
-        return pd.Series(index=x.index, dtype=float)
+def _percent_rank_last(arr: np.ndarray) -> float:
+    n = arr.size
+    if n <= 1:
+        return np.nan
+    sorted_arr = np.sort(arr)
+    idx = np.searchsorted(sorted_arr, arr[-1], side="right") - 1
+    return idx / (n - 1)
 
-    def last_value_avg_percentile(arr: np.ndarray) -> float:
-        if arr.size == 0:
-            return np.nan
-        last = arr[-1]
-        if np.isnan(last):
-            return np.nan
-        valid = arr[~np.isnan(arr)]
-        n = valid.size
-        if n == 0:
-            return np.nan
-        num_less = np.sum(valid < last)
-        num_equal = np.sum(valid == last)
-        percentile = (num_less + 0.5 * num_equal) / n  # in [0,1]
-        return 2.0 * percentile - 1.0  # map to [-1, 1]
 
-    return x.rolling(window=window, min_periods=window).apply(last_value_avg_percentile, raw=True)
+def _rolling_percentile(x: pd.Series, window: int) -> pd.Series:
+    return x.rolling(window=window, min_periods=window).apply(_percent_rank_last, raw=True)
 
 
 def map_factor_to_target_notional(
@@ -50,11 +37,12 @@ def map_factor_to_target_notional(
 ) -> pd.Series:
     """
     Map factor values to target dollar notional exposures.
-    - Step 1: Normalize factor -> signal in [-1, 1] using mapper.
-    - Step 2: Apply trade_mode
-        * continuous: leverage-scale normalized signal
-        * threshold: enter long if s >= long_thr, short if s <= short_thr, else no new target (NaN)
-    If short is not allowed, negatives are set to 0.
+    - mapper 'zscore': rolling z-score ([-inf, inf]) clipped to [-clip_abs, clip_abs]
+    - mapper 'sign': sign(f)
+    - mapper 'percentile': rolling percentile in [0,1] mapped to [-1,1]
+    Trade modes:
+      continuous: asymmetric leverage on normalized signal
+      threshold: discrete entries when thresholds crossed; NaN means hold
     """
     f = factor.copy().astype(float)
 
@@ -65,9 +53,8 @@ def map_factor_to_target_notional(
         s = np.sign(f)
         s = s.clip(lower=-clip_abs, upper=clip_abs)
     elif mapper == "percentile":
-        # Use zscore_window as the rolling window length for percentile as well
-        s = _rolling_percentile_signal(f, zscore_window)
-        s = s.clip(lower=-clip_abs, upper=clip_abs)
+        p = _rolling_percentile(f, zscore_window)
+        s = (2.0 * p - 1.0).clip(lower=-clip_abs, upper=clip_abs)
     else:
         raise ValueError(f"Unknown mapper: {mapper}")
 
@@ -75,17 +62,14 @@ def map_factor_to_target_notional(
         s = s.clip(lower=0.0)
 
     if trade_mode == "continuous":
-        # Asymmetric leverage
         s_pos = s.clip(lower=0) * float(long_leverage)
         s_neg = s.clip(upper=0) * float(short_leverage)
         s_levered = s_pos + s_neg
         target_notional = capital * s_levered.fillna(0.0)
     elif trade_mode == "threshold":
-        # Discrete entries: +1, -1, or no new instruction (NaN)
         st = pd.Series(index=s.index, dtype=float)
         st[(s >= float(entry_long_threshold))] = float(long_leverage)
         st[(s <= float(entry_short_threshold))] = -float(short_leverage)
-        # If not allow_short, remove shorts
         if not allow_short:
             st[st < 0] = np.nan
         target_notional = capital * st

@@ -100,6 +100,7 @@ def example_momo(window_ohlcv: np.ndarray) -> float:
 - Outputs are written to `reports/{factor_name}/` and include:
   - `rolling_ic.png`, `rolling_ic_cumsum.png`, `pnl.png`, `net_value.png`
   - `ic_metrics.csv`, `results_core.csv`
+  - A replicate of the config `backtest.yaml` is also included
 
 ### Running a backtest
 1. Install dependencies:

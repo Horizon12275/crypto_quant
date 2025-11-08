@@ -1,5 +1,7 @@
 # Backtest configuration (single-asset, single-factor CTA)
 
+mode: combo   # single | combo
+
 data:
   source_csv: okx_BTCUSDT_1min_data.csv
   timezone: UTC
@@ -10,7 +12,7 @@ data:
 
 signals:
   factor: pvcorr
-  lookback_minutes: 721
+  lookback_minutes: 5000
   k_minutes: 720
   evaluate_on_rebalance_only: true
   # mapper for factor normalization into [-1,1]: zscore | sign | percentile
@@ -30,10 +32,25 @@ execution:
   long_leverage: 1.0
   short_leverage: 1.0
   cost_bps: 7.0
-  stop_loss_pct: 0.05
+  stop_loss_pct: 0.03
+
+# Combo and risk control
+combo:
+  name: combo_pvcorr_double_ma
+  factors: [pvcorr, double_ma]       # e.g., [reversal, illiq, volatility]
+  weights: []       # optional; equal weights if empty
+
+risk_control:
+  enabled: false
+  vol_lookback_days: 63
+  vol_target_ann: 0.4
+  max_gross_leverage: 1.0
+  rebalance: monthly   # monthly | days
+  rebalance_days: 30   # used if rebalance == days
 
 reporting:
   out_dir: reports
   ic_rolling_window: 50
-  write_results_core: false
   plots: [rolling_ic, rolling_ic_cumsum, pnl, equity]
+  write_results_core: false
+  folder: combo_pvcorr_double_ma_0.4risk_control

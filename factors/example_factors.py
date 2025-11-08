@@ -57,9 +57,17 @@ def pvcorr(window_ohlcv: np.ndarray) -> float:
         return np.nan
     return np.corrcoef(close, volume)[0, 1]
 
+def double_ma(window_ohlcv: np.ndarray) -> float:
+    wind = 1440
+    close = window_ohlcv[:, 3]
+    if close.size == 0:
+        return np.nan
+    return np.mean(close[-wind:]) / np.mean(close[-3*wind:])
+
 def register(registry) -> None:
     registry.register("reversal", reversal)
     registry.register("illiq", illiq)
     registry.register("volatility", volatility)
     registry.register("pvcorr", pvcorr)
     registry.register("reversal_continuous", reversal_continuous)
+    registry.register("double_ma", double_ma)

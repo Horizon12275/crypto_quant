@@ -14,8 +14,8 @@ signals:
   zscore_window: 100
   clip_abs_signal: 1.0
   trade_mode: threshold
-  entry_long_threshold: 0.9
-  entry_short_threshold: -0.9
+  entry_long_threshold: 0.95
+  entry_short_threshold: -0.95
 execution:
   rebalance_minutes: 720
   trade_delay_minutes: 1
@@ -46,4 +46,4 @@ reporting:
   - pnl
   - equity
   write_results_core: false
-  folder: pvcorr_0.9
+  folder: pvcorr_0.95

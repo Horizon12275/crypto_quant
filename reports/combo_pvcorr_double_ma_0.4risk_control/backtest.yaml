@@ -1,4 +1,4 @@
-mode: single
+mode: combo
 data:
   source_csv: okx_BTCUSDT_1min_data.csv
   timezone: UTC
@@ -26,14 +26,15 @@ execution:
   cost_bps: 7.0
   stop_loss_pct: 0.03
 combo:
-  name: combo_pvcorr
+  name: combo_pvcorr_double_ma
   factors:
   - pvcorr
+  - double_ma
   weights: []
 risk_control:
-  enabled: true
+  enabled: false
   vol_lookback_days: 63
-  vol_target_ann: 0.25
+  vol_target_ann: 0.4
   max_gross_leverage: 1.0
   rebalance: monthly
   rebalance_days: 30
@@ -46,4 +47,4 @@ reporting:
   - pnl
   - equity
   write_results_core: false
-  folder: pvcorr_0.9
+  folder: combo_pvcorr_double_ma_0.4risk_control

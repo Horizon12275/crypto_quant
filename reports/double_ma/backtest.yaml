@@ -6,7 +6,7 @@ data:
   end: 2025-01-01 00:00:00
   forward_fill: true
 signals:
-  factor: pvcorr
+  factor: double_ma
   lookback_minutes: 5000
   k_minutes: 720
   evaluate_on_rebalance_only: true
@@ -14,8 +14,8 @@ signals:
   zscore_window: 100
   clip_abs_signal: 1.0
   trade_mode: threshold
-  entry_long_threshold: 0.9
-  entry_short_threshold: -0.9
+  entry_long_threshold: 0.98
+  entry_short_threshold: -0.98
 execution:
   rebalance_minutes: 720
   trade_delay_minutes: 1
@@ -46,4 +46,3 @@ reporting:
   - pnl
   - equity
   write_results_core: false
-  folder: pvcorr_0.9
