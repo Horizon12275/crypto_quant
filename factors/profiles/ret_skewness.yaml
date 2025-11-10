@@ -9,6 +9,6 @@ trade_mode: threshold
 entry_long_threshold: 0.90
 entry_short_threshold: -0.90
 allow_short: false
-long_leverage: 2.0
+long_leverage: 5.0
 short_leverage: 1.0
 stop_loss_pct: 0.03
