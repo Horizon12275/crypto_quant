@@ -1,21 +1,19 @@
 type: single
-
 data:
   source_csv: okx_BTCUSDT_1min_data.csv
   timezone: UTC
   start: 2020-01-01 00:00:00
   end: 2025-01-01 00:00:00
   forward_fill: true
-
-factor_profile: pvcorr
-
+factor_profile: ret_skewness
 execution:
   initial_capital: 100000
   trade_delay_minutes: 1
   cost_bps: 7
-
 reporting:
   out_dir: reports
-  plots: [pnl, equity]
+  plots:
+  - pnl
+  - equity
   write_results_core: false
-  folder: pvcorr
+  folder: ret_skewness

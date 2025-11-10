@@ -1,4 +1,4 @@
-factor: pvcorr
+factor: ret_skewness
 lookback_minutes: 5000
 k_minutes: 720
 rebalance_minutes: 720

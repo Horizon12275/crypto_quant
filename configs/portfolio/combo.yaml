@@ -1,4 +1,5 @@
-type: single
+type: portfolio
+name: combo_pvcorr_double_ma
 
 data:
   source_csv: okx_BTCUSDT_1min_data.csv
@@ -7,15 +8,26 @@ data:
   end: 2025-01-01 00:00:00
   forward_fill: true
 
-factor_profile: double_ma
+sleeves:
+  - profile: pvcorr
+    weight: 0.5
+  - profile: ret_skewness
+    weight: 0.5
 
 execution:
   initial_capital: 100000
   trade_delay_minutes: 1
   cost_bps: 7
 
+risk_control:
+  enabled: true
+  vol_lookback_days: 63
+  vol_target_ann: 0.5
+  rebalance: monthly
+  rebalance_days: 30
+
 reporting:
   out_dir: reports
   plots: [pnl, equity]
   write_results_core: false
-  folder: double_ma
+  folder: combo_pvcorr_double_ma
