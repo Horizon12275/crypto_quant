@@ -98,5 +98,5 @@ def clear_datas(exchange_name, symbol):
     df.to_csv(f'{exchange_name}_{symbol_path}_1min_data.csv')
 
 #crawl_exchanges_datas('okx', 'BTC/USDT', '2022-01-01', '2025-01-01')
-crawl_exchanges_datas('okx', 'BTC/USDT', '2020-01-01', '2022-01-01')
-clear_datas('okx','BTC/USDT')
+crawl_exchanges_datas('okx', 'ETH/USDT', '2020-01-01', '2025-01-01')
+clear_datas('okx','ETH/USDT')

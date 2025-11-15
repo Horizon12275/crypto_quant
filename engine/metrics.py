@@ -1,4 +1,5 @@
 import pandas as pd
+import numpy as np
 from typing import Dict
 
 
@@ -45,22 +46,26 @@ def _max_drawdown(series: pd.Series) -> float:
 def compute_performance_summary(equity: pd.Series, initial_capital: float) -> Dict[str, float]:
     """
     Compute key metrics using daily equity: annualized return/vol, Sharpe, max drawdown, Calmar.
+    Robust to equity drawdowns beyond -100% (caps CAGR at -100%) and non-finite returns.
     Annualization uses 365 days for crypto markets.
     """
-    if equity.empty:
+    if equity is None or equity.empty:
         return {"annual_return": 0.0, "annual_vol": 0.0, "sharpe": 0.0, "max_drawdown": 0.0, "calmar": 0.0, "days": 0}
 
     daily = equity.resample("1D").last().dropna()
     if len(daily) < 2:
         return {"annual_return": 0.0, "annual_vol": 0.0, "sharpe": 0.0, "max_drawdown": 0.0, "calmar": 0.0, "days": len(daily)}
 
-    daily_returns = daily.pct_change().dropna()
+    daily_returns = daily.pct_change().replace([np.inf, -np.inf], np.nan).dropna()
     num_days = len(daily_returns)
 
-    total_return = float(daily.iloc[-1] / daily.iloc[0] - 1.0)
-    annual_return = (1.0 + total_return) ** (365.0 / num_days) - 1.0 if num_days > 0 else 0.0
+    ratio = float(daily.iloc[-1] / daily.iloc[0]) if daily.iloc[0] != 0 else 0.0
+    if ratio <= 0:
+        annual_return = -1.0
+    else:
+        annual_return = ratio ** (365.0 / num_days) - 1.0
 
-    daily_vol = float(daily_returns.std(ddof=0))
+    daily_vol = float(daily_returns.std(ddof=0)) if num_days > 0 else 0.0
     annual_vol = daily_vol * (365.0 ** 0.5)
 
     sharpe = (annual_return / annual_vol) if annual_vol > 0 else 0.0

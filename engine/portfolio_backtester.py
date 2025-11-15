@@ -1,6 +1,6 @@
 import pandas as pd
 import numpy as np
-from typing import Dict, Any, Iterable
+from typing import Dict, Any, Iterable, Optional
 
 
 def run_portfolio_backtest(
@@ -10,20 +10,27 @@ def run_portfolio_backtest(
     targets_by_factor: Dict[str, pd.Series],
     initial_capital: float,
     cost_bps: float = 0.0,
+    weights_by_factor: Optional[Dict[str, float]] = None,
+    min_trade_notional: float = 1e-6,
 ) -> Dict[str, Any]:
     """
-    Multi-sleeve backtest. `targets_by_factor` maps factor_name to target_notional Series (on minute index).
-    Per-sleeve stop-loss is provided via Series.attrs["stop_loss_pct"] on each series (optional).
+    Multi-sleeve backtest. `targets_by_factor` maps factor_name to series values interpreted as FRACTIONS
+    (exposure multipliers). At trade time: target_notional_i = fraction_i * (portfolio_equity_before * weight_i).
+    Per-sleeve stop-loss via Series.attrs["stop_loss_pct"].
+    Ignore micro trades where abs(delta_units)*price < min_trade_notional.
     """
     opens = df["open"].astype(float)
     index = opens.index
 
     eval_times = pd.DatetimeIndex(eval_times).intersection(index)
 
-    # Build trade plan per sleeve: trade at eval_time + delay
+    if weights_by_factor is None or set(weights_by_factor.keys()) != set(targets_by_factor.keys()):
+        n = len(targets_by_factor)
+        weights_by_factor = {k: 1.0 / n for k in targets_by_factor.keys()} if n > 0 else {}
+
     plans: Dict[str, Dict[pd.Timestamp, float]] = {}
     for fname, series in targets_by_factor.items():
-        series = series.reindex(index)
+        series = series.reindex(eval_times)
         plan: Dict[pd.Timestamp, float] = {}
         for t_eval in eval_times:
             t_trade = t_eval + pd.to_timedelta(trade_delay_minutes, unit="min")
@@ -33,17 +40,14 @@ def run_portfolio_backtest(
 
     cash = float(initial_capital)
     units: Dict[str, float] = {fname: 0.0 for fname in targets_by_factor.keys()}
-
     entries: Dict[str, float] = {fname: None for fname in targets_by_factor.keys()}
 
     equity = []
     pnl = []
-
     trades = []
 
     prev_price = None
 
-    # Buy-and-hold baseline
     if not index.empty:
         bh_units = float(initial_capital) / float(opens.iloc[0]) if float(opens.iloc[0]) != 0 else 0.0
     else:
@@ -55,13 +59,9 @@ def run_portfolio_backtest(
     for t in index:
         price = float(opens.loc[t])
 
-        # Aggregate minute pnl from price move
-        if prev_price is not None:
-            minute_pnl = sum(units[f] for f in units.keys()) * (price - prev_price)
-        else:
-            minute_pnl = 0.0
+        port_units = sum(units.values())
+        minute_pnl = port_units * (price - (prev_price if prev_price is not None else price))
 
-        # Stop-loss per sleeve
         for fname, u in list(units.items()):
             stop_pct = float(targets_by_factor[fname].attrs.get("stop_loss_pct", 0.0)) if hasattr(targets_by_factor[fname], "attrs") else 0.0
             if stop_pct and u != 0 and entries[fname] is not None:
@@ -69,31 +69,34 @@ def run_portfolio_backtest(
                 if signed_ret <= -abs(stop_pct):
                     delta_units = -u
                     traded_notional = abs(delta_units) * price
-                    cost = traded_notional * float(cost_bps) / 10000.0
-                    cash -= (delta_units * price)
-                    cash -= cost
-                    trades.append({
-                        "time": t,
-                        "factor": fname,
-                        "price": price,
-                        "target_notional": 0.0,
-                        "target_units": 0.0,
-                        "delta_units": delta_units,
-                        "traded_notional": traded_notional,
-                        "cost": cost,
-                        "reason": "stop_loss",
-                    })
+                    if traded_notional >= min_trade_notional:
+                        cost = traded_notional * float(cost_bps) / 10000.0
+                        cash -= (delta_units * price)
+                        cash -= cost
+                        trades.append({
+                            "time": t,
+                            "factor": fname,
+                            "price": price,
+                            "target_notional": 0.0,
+                            "target_units": 0.0,
+                            "delta_units": delta_units,
+                            "traded_notional": traded_notional,
+                            "cost": cost,
+                            "reason": "stop_loss",
+                        })
                     units[fname] = 0.0
                     entries[fname] = None
 
-        # Scheduled trades
+        equity_before = cash + sum(units.values()) * price
         for fname, plan in plans.items():
             if t in plan:
-                target_notional_t = float(plan[t])
+                fraction = float(plan[t])
+                weight = float(weights_by_factor.get(fname, 0.0))
+                target_notional_t = fraction * equity_before * weight
                 target_units = target_notional_t / price if price != 0 else 0.0
                 delta_units = target_units - units[fname]
-                if delta_units != 0:
-                    traded_notional = abs(delta_units) * price
+                traded_notional = abs(delta_units) * price
+                if traded_notional >= min_trade_notional:
                     cost = traded_notional * float(cost_bps) / 10000.0
                     cash -= (delta_units * price)
                     cash -= cost
@@ -114,12 +117,10 @@ def run_portfolio_backtest(
                     elif prev_u == 0.0 or np.sign(prev_u) != np.sign(units[fname]):
                         entries[fname] = price
 
-        # Aggregate equity
-        equity_t = cash + price * sum(units[f] for f in units.keys())
+        equity_t = cash + sum(units.values()) * price
         equity.append(equity_t)
         pnl.append(minute_pnl)
 
-        # Baseline
         if bh_prev_price is not None:
             bh_minute_pnl = bh_units * (price - bh_prev_price)
         else:

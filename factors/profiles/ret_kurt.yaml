@@ -1,0 +1,14 @@
+factor: ret_kurt
+lookback_minutes: 5000
+k_minutes: 720
+rebalance_minutes: 720
+mapper: percentile
+zscore_window: 200
+clip_abs_signal: 1.0
+trade_mode: threshold
+entry_long_threshold: 0.8
+entry_short_threshold: -0.8
+allow_short: false
+long_leverage: 1.0
+short_leverage: 1.0
+stop_loss_pct: 0.05

@@ -7,7 +7,7 @@ from factors.registry import register_builtin_factors, registry
 from engine.data_loader import load_minute_data
 from engine.profile_loader import load_factor_profile
 from engine.factor_engine import compute_factors
-from engine.signal import map_factor_to_target_notional
+from engine.signal import map_factor_to_target_notional, map_factor_to_target_fraction
 from engine.backtester import run_backtest
 from engine.portfolio_backtester import run_portfolio_backtest
 from engine.combo import build_combo_targets_from_profiles
@@ -19,6 +19,16 @@ def save_config(out_dir: str, cfg: dict) -> None:
     os.makedirs(out_dir, exist_ok=True)
     with open(os.path.join(out_dir, "backtest.yaml"), "w") as f:
         yaml.safe_dump(cfg, f, sort_keys=False)
+
+
+def _compute_eval_times(index: pd.DatetimeIndex, rebalance_minutes: int) -> pd.DatetimeIndex:
+    if len(index) == 0:
+        return index
+    freq = pd.Timedelta(minutes=int(rebalance_minutes))
+    anchor = index[0].normalize()
+    schedule = pd.date_range(start=anchor, end=index[-1], freq=freq, tz=index.tz)
+    schedule = schedule[schedule >= index[0]]
+    return index.intersection(schedule)
 
 
 def run_single(cfg: dict) -> None:
@@ -52,11 +62,7 @@ def run_single(cfg: dict) -> None:
     trade_delay = int(exec_cfg.get("trade_delay_minutes", 1))
     cost_bps = float(exec_cfg.get("cost_bps", 0.0))
 
-    # Eval times
-    minute_index = df.index
-    first = minute_index[0]
-    aligned_start = first + pd.Timedelta(minutes=(rebalance_minutes - (first.minute % rebalance_minutes)) % rebalance_minutes)
-    eval_times = minute_index[(minute_index >= aligned_start) & (((minute_index - aligned_start).asi8 // 60_000_000_000) % rebalance_minutes == 0)]
+    eval_times = _compute_eval_times(df.index, rebalance_minutes)
 
     factor_fn = registry.get(profile_name)
     factor_series = compute_factors(df=df, factor_fn=factor_fn, lookback_minutes=lookback, eval_times=eval_times)
@@ -68,9 +74,8 @@ def run_single(cfg: dict) -> None:
         labels = build_labels(df=df, eval_times=eval_times, k_minutes=k_minutes)
         ic_metrics = compute_ic_metrics(factor=factor_series, label=labels, rolling_window=50)
 
-    targets = map_factor_to_target_notional(
+    target_fraction = map_factor_to_target_fraction(
         factor=factor_series,
-        capital=initial_capital,
         mapper=mapper,
         zscore_window=zscore_window,
         clip_abs=clip_abs,
@@ -86,7 +91,7 @@ def run_single(cfg: dict) -> None:
         df=df,
         eval_times=eval_times,
         trade_delay_minutes=trade_delay,
-        target_notional=targets,
+        target_fraction=target_fraction,
         initial_capital=initial_capital,
         cost_bps=cost_bps,
         stop_loss_pct=stop_loss_pct,
@@ -104,6 +109,7 @@ def run_single(cfg: dict) -> None:
         plots=cfg["reporting"].get("plots", []),
         write_results_core=bool(cfg["reporting"].get("write_results_core", False)),
         summary=summary,
+        write_trades_csv=bool(cfg["reporting"].get("write_trades_csv", False)),
     )
 
     print("Backtest complete. Reports written to:", out_dir)
@@ -127,7 +133,8 @@ def run_portfolio(cfg: dict) -> None:
     trade_delay = int(exec_cfg.get("trade_delay_minutes", 1))
     cost_bps = float(exec_cfg.get("cost_bps", 0.0))
 
-    eval_times, targets_by_factor = build_combo_targets_from_profiles(
+    from engine.combo import build_combo_targets_from_profiles
+    eval_times, fraction_by_factor, weights_by_factor = build_combo_targets_from_profiles(
         df=df,
         initial_capital=initial_capital,
         sleeves=sleeves,
@@ -138,9 +145,10 @@ def run_portfolio(cfg: dict) -> None:
         df=df,
         eval_times=eval_times,
         trade_delay_minutes=trade_delay,
-        targets_by_factor=targets_by_factor,
+        targets_by_factor=fraction_by_factor,
         initial_capital=initial_capital,
         cost_bps=cost_bps,
+        weights_by_factor=weights_by_factor,
     )
 
     summary = compute_performance_summary(results["equity"], initial_capital)
@@ -156,6 +164,7 @@ def run_portfolio(cfg: dict) -> None:
         plots=cfg["reporting"].get("plots", []),
         write_results_core=bool(cfg["reporting"].get("write_results_core", False)),
         summary=summary,
+        write_trades_csv=bool(cfg["reporting"].get("write_trades_csv", False)),
     )
 
     print("Backtest complete. Reports written to:", out_dir)

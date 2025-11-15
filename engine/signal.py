@@ -36,13 +36,8 @@ def map_factor_to_target_notional(
     entry_short_threshold: float = -0.9,
 ) -> pd.Series:
     """
-    Map factor values to target dollar notional exposures.
-    - mapper 'zscore': rolling z-score ([-inf, inf]) clipped to [-clip_abs, clip_abs]
-    - mapper 'sign': sign(f)
-    - mapper 'percentile': rolling percentile in [0,1] mapped to [-1,1]
-    Trade modes:
-      continuous: asymmetric leverage on normalized signal
-      threshold: discrete entries when thresholds crossed; NaN means hold
+    Legacy: returns dollar target notionals using a fixed 'capital'. Prefer map_factor_to_target_fraction for
+    dynamic equity sizing.
     """
     f = factor.copy().astype(float)
 
@@ -78,4 +73,58 @@ def map_factor_to_target_notional(
         raise ValueError(f"Unknown trade_mode: {trade_mode}")
 
     target_notional.name = "target_notional"
-    return target_notional 
+    return target_notional
+
+
+def map_factor_to_target_fraction(
+    factor: pd.Series,
+    mapper: str = "zscore",
+    zscore_window: int = 100,
+    clip_abs: float = 1.0,
+    allow_short: bool = True,
+    long_leverage: float = 1.0,
+    short_leverage: float = 1.0,
+    trade_mode: str = "continuous",
+    entry_long_threshold: float = 0.9,
+    entry_short_threshold: float = -0.9,
+) -> pd.Series:
+    """
+    Return target exposure fraction series in [-inf, inf], which will be multiplied by current equity at trade time.
+    - continuous: rolling-zscore/sign/percentile normalized and levered asymmetrically
+    - threshold: returns +/- leverage when thresholds are crossed; NaN means hold existing
+    """
+    f = factor.copy().astype(float)
+
+    if mapper == "zscore":
+        s = _rolling_zscore(f, zscore_window)
+        s = s.clip(lower=-clip_abs, upper=clip_abs)
+    elif mapper == "sign":
+        s = np.sign(f)
+        s = s.clip(lower=-clip_abs, upper=clip_abs)
+    elif mapper == "percentile":
+        p = _rolling_percentile(f, zscore_window)
+        s = (2.0 * p - 1.0).clip(lower=-clip_abs, upper=clip_abs)
+    else:
+        raise ValueError(f"Unknown mapper: {mapper}")
+
+    # if not allow_short:
+    #     s = s.clip(lower=0.0)
+
+    if trade_mode == "continuous":
+        s_pos = s.clip(lower=0) * float(long_leverage)
+        s_neg = s.clip(upper=0) * float(short_leverage)
+        frac = (s_pos + s_neg).fillna(0.0)
+        if not allow_short:
+            frac[frac < 0] = 0
+
+    elif trade_mode == "threshold":
+        frac = pd.Series(data=np.nan, index=s.index, dtype=float)
+        frac[(s >= float(entry_long_threshold))] = float(long_leverage)
+        frac[(s <= float(entry_short_threshold))] = -float(short_leverage)
+        if not allow_short:
+            frac[frac < 0] = 0
+    else:
+        raise ValueError(f"Unknown trade_mode: {trade_mode}")
+
+    frac.name = "target_fraction"
+    return frac 

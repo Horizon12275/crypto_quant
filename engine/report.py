@@ -21,6 +21,7 @@ def generate_reports(
     plots: List[str],
     write_results_core: bool = False,
     summary: Optional[Dict[str, float]] = None,
+    write_trades_csv: bool = False,
 ) -> None:
     os.makedirs(out_dir, exist_ok=True)
 
@@ -32,6 +33,10 @@ def generate_reports(
         print("Performance summary:")
         for k, v in summary.items():
             print(f"  {k}: {v}")
+
+    # Save trades if requested
+    if write_trades_csv and isinstance(results.get("trades"), pd.DataFrame) and not results["trades"].empty:
+        results["trades"].to_csv(os.path.join(out_dir, "trades.csv"))
 
     # Save core series as CSV for convenience
     if ic_metrics:

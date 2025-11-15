@@ -1,13 +1,13 @@
 type: portfolio
-name: combo_pvcorr_double_ma
+name: combo_double_ma_ret_skewness
 data:
   source_csv: okx_BTCUSDT_1min_data.csv
   timezone: UTC
-  start: 2020-01-01 00:00:00
+  start: 2022-01-01 00:00:00
   end: 2025-01-01 00:00:00
   forward_fill: true
 sleeves:
-- profile: pvcorr
+- profile: double_ma
   weight: 0.5
 - profile: ret_skewness
   weight: 0.5
@@ -16,7 +16,7 @@ execution:
   trade_delay_minutes: 1
   cost_bps: 7
 risk_control:
-  enabled: true
+  enabled: false
   vol_lookback_days: 63
   vol_target_ann: 0.5
   rebalance: monthly
@@ -27,4 +27,4 @@ reporting:
   - pnl
   - equity
   write_results_core: false
-  folder: combo_pvcorr_double_ma
+  folder: combo_double_ma_ret_skewness
