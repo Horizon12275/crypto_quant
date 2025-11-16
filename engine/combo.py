@@ -4,7 +4,7 @@ import pandas as pd
 from typing import Dict, List, Tuple, Optional
 
 from engine.factor_engine import compute_factors
-from engine.signal import map_factor_to_target_notional
+from engine.signal import map_factor_to_target_fraction
 from engine.risk import compute_risk_scaler
 from engine.profile_loader import load_factor_profile
 from factors.registry import registry
@@ -31,9 +31,11 @@ def _load_factor_config_from_report(base_dir: str, factor_name: str) -> Optional
 def _compute_eval_times(index: pd.DatetimeIndex, rebalance_minutes: int) -> pd.DatetimeIndex:
     if len(index) == 0:
         return index
-    first = index[0]
-    aligned_start = first + pd.Timedelta(minutes=(rebalance_minutes - (first.minute % rebalance_minutes)) % rebalance_minutes)
-    return index[(index >= aligned_start) & (((index - aligned_start).asi8 // 60_000_000_000) % rebalance_minutes == 0)]
+    freq = pd.Timedelta(minutes=int(rebalance_minutes))
+    anchor = index[0].normalize()
+    schedule = pd.date_range(start=anchor, end=index[-1], freq=freq, tz=index.tz)
+    schedule = schedule[schedule >= index[0]]
+    return index.intersection(schedule)
 
 
 def build_combo_targets(
@@ -103,7 +105,7 @@ def build_combo_targets(
 
         capital_i = float(initial_capital) * float(weight)
         # Map without per-sleeve leverage to avoid double-counting; leverage enforced via risk scaler floor
-        tn_unlevered = map_factor_to_target_notional(
+        tn_unlevered = map_factor_to_target_fraction(
             factor=factor_series,
             capital=capital_i,
             mapper=mapper,
@@ -136,15 +138,14 @@ def build_combo_targets_from_profiles(
     initial_capital: float,
     sleeves: List[Dict],
     risk_cfg: Dict,
-) -> Tuple[pd.DatetimeIndex, Dict[str, pd.Series]]:
+) -> Tuple[pd.DatetimeIndex, Dict[str, pd.Series], Dict[str, float]]:
     """
-    New builder: sleeves = [{ profile: name, weight: 0.5, overrides...}, ...]
-    Applies shared base risk scaler, then per-sleeve leverage floor.
+    Return (union_eval_times, fraction_by_factor, weights_by_factor).
+    Fractions are risk-scaled and will be sized to equity*weight at trade time.
     """
     if not sleeves:
         raise ValueError("sleeves list is empty")
 
-    # Normalize weights
     weights = [float(s.get("weight", 1.0)) for s in sleeves]
     total = sum(weights)
     weights = [w / total for w in weights] if total != 0 else [1.0 / len(sleeves)] * len(sleeves)
@@ -158,13 +159,13 @@ def build_combo_targets_from_profiles(
     )
 
     union_eval_times = pd.DatetimeIndex([])
-    targets: Dict[str, pd.Series] = {}
+    fractions: Dict[str, pd.Series] = {}
+    weight_map: Dict[str, float] = {}
 
     for sleeve, weight in zip(sleeves, weights):
         prof_name = sleeve["profile"]
         prof = load_factor_profile(prof_name)
 
-        # Extract params from profile, allow overrides in sleeve
         lookback = int(sleeve.get("lookback_minutes", prof.get("lookback_minutes", 720)))
         mapper = sleeve.get("mapper", prof.get("mapper", "zscore"))
         zscore_window = int(sleeve.get("zscore_window", prof.get("zscore_window", 100)))
@@ -184,16 +185,13 @@ def build_combo_targets_from_profiles(
         factor_fn = registry.get(prof_name)
         factor_series = compute_factors(df=df, factor_fn=factor_fn, lookback_minutes=lookback, eval_times=eval_times)
 
-        capital_i = float(initial_capital) * float(weight)
-        # Map without leverage; enforce leverage via scaler floor
-        tn_unlevered = map_factor_to_target_notional(
+        frac = map_factor_to_target_fraction(
             factor=factor_series,
-            capital=capital_i,
             mapper=mapper,
             zscore_window=zscore_window,
             clip_abs=clip_abs,
             allow_short=allow_short,
-            long_leverage=1.0,
+            long_leverage=1.0,  # leverage via scaler floor
             short_leverage=1.0,
             trade_mode=trade_mode,
             entry_long_threshold=entry_long_threshold,
@@ -202,10 +200,12 @@ def build_combo_targets_from_profiles(
 
         leverage_floor = max(abs(long_leverage), abs(short_leverage))
         scaler_i = base_scaler.clip(lower=leverage_floor)
-        tn = tn_unlevered.reindex(df.index) * scaler_i
-        tn.name = f"target_notional_{prof_name}"
-        tn.attrs = {"stop_loss_pct": stop_loss_pct}
-        targets[prof_name] = tn
+        frac_scaled = frac.reindex(df.index) * scaler_i
+        frac_scaled.name = f"target_fraction_{prof_name}"
+        frac_scaled.attrs = {"stop_loss_pct": stop_loss_pct}
+
+        fractions[prof_name] = frac_scaled
+        weight_map[prof_name] = weight
 
     union_eval_times = union_eval_times.intersection(df.index)
-    return union_eval_times, targets
+    return union_eval_times, fractions, weight_map

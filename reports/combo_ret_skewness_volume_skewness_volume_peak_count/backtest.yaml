@@ -1,16 +1,18 @@
 type: portfolio
-name: combo_pvcorr_ret_skewness_leverage_5_no_risk_control
+name: combo_ret_skewness_volume_skewness_volume_peak_count
 data:
   source_csv: okx_BTCUSDT_1min_data.csv
   timezone: UTC
-  start: 2020-01-01 00:00:00
+  start: 2022-01-01 00:00:00
   end: 2025-01-01 00:00:00
   forward_fill: true
 sleeves:
-- profile: pvcorr
-  weight: 0.5
 - profile: ret_skewness
-  weight: 0.5
+  weight: 0.3
+- profile: volume_skewness
+  weight: 0.3
+- profile: volume_peak_count
+  weight: 0.4
 execution:
   initial_capital: 100000
   trade_delay_minutes: 1
@@ -27,4 +29,4 @@ reporting:
   - pnl
   - equity
   write_results_core: false
-  folder: combo_pvcorr_ret_skewness_leverage_5_no_risk_control
+  folder: combo_ret_skewness_volume_skewness_volume_peak_count

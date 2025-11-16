@@ -29,4 +29,7 @@ def register_builtin_factors() -> None:
     """Import and register built-in example factors."""
     module = importlib.import_module("factors.example_factors")
     if hasattr(module, "register"):
-        module.register(registry) 
+        module.register(registry)
+    module = importlib.import_module("factors.volume_factors")
+    if hasattr(module, "register"):
+        module.register(registry)

@@ -2,7 +2,7 @@ type: single
 data:
   source_csv: okx_BTCUSDT_1min_data.csv
   timezone: UTC
-  start: 2020-01-01 00:00:00
+  start: 2022-01-01 00:00:00
   end: 2025-01-01 00:00:00
   forward_fill: true
 factor_profile: ret_skewness
@@ -17,3 +17,4 @@ reporting:
   - equity
   write_results_core: false
   folder: ret_skewness
+  write_trades_csv: true
