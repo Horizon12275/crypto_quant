@@ -2,3 +2,4 @@ okx_BTCUSDT_1min_data.csv
 okx/BTCUSDT/*
 .vscode/
 */__pycache__/
+/engine/__pycache__
