@@ -33,6 +33,28 @@ def crawl_exchanges_datas(exchange_name, symbol, start_time, end_time):
     start_time_stamp = int(time.mktime(start_time.timetuple())) * 1000
     end_time_stamp = int(time.mktime(end_time.timetuple())) * 1000
 
+    # If shards already exist for this symbol, skip the covered range
+    try:
+        existing_files = [f for f in os.listdir(file_dir) if f.endswith('.csv')]
+        if existing_files:
+            existing_ts = []
+            for f in existing_files:
+                try:
+                    ts = int(os.path.splitext(f)[0])
+                    existing_ts.append(ts)
+                except Exception:
+                    continue
+            if existing_ts:
+                last_saved_ts = max(existing_ts)
+                # jump to the next minute after the last saved timestamp
+                start_time_stamp = max(start_time_stamp, last_saved_ts + 60_000)
+                print(f"发现已有历史分片，跳过至: {datetime.datetime.utcfromtimestamp(start_time_stamp/1000.0)} UTC")
+                if start_time_stamp > end_time_stamp:
+                    print("已有数据已覆盖指定区间，无需下载。")
+                    return
+    except Exception as e:
+        print(f"检查已下载分片时出错，继续正常下载: {e}")
+
     print(start_time_stamp)  # 1529233920000
     print(end_time_stamp)
 
@@ -57,7 +79,7 @@ def crawl_exchanges_datas(exchange_name, symbol, start_time, end_time):
                 print("完成数据的请求.")
                 break
 
-            time.sleep(0.1)
+            time.sleep(0.02)
 
         except Exception as error:
             print(error)

@@ -1,4 +1,4 @@
-factor: ret_skewness
+factor: volume_skewness
 lookback_minutes: 5000
 k_minutes: 720
 rebalance_minutes: 720
@@ -6,8 +6,8 @@ mapper: percentile
 zscore_window: 200
 clip_abs_signal: 1.0
 trade_mode: threshold
-entry_long_threshold: 0.9
-entry_short_threshold: -0.9
+entry_long_threshold: 0.90
+entry_short_threshold: -0.90
 allow_short: false
 long_leverage: 1.0
 short_leverage: 1.0

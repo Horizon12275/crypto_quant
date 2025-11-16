@@ -1,5 +1,5 @@
 type: portfolio
-name: combo_double_ma_ret_skewness_rsi
+name: combo_ret_skewness_volume_skewness_volume_peak_count
 data:
   source_csv: okx_BTCUSDT_1min_data.csv
   timezone: UTC
@@ -7,12 +7,12 @@ data:
   end: 2025-01-01 00:00:00
   forward_fill: true
 sleeves:
-- profile: double_ma
-  weight: 0.3
 - profile: ret_skewness
-  weight: 0.4
-- profile: rsi
   weight: 0.3
+- profile: volume_skewness
+  weight: 0.3
+- profile: volume_peak_count
+  weight: 0.4
 execution:
   initial_capital: 100000
   trade_delay_minutes: 1
@@ -29,4 +29,4 @@ reporting:
   - pnl
   - equity
   write_results_core: false
-  folder: combo_double_ma_ret_skewness_rsi
+  folder: combo_ret_skewness_volume_skewness_volume_peak_count
